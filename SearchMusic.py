@@ -17,28 +17,10 @@ import urllib.parse
     name="SearchMusic",
     desire_priority=100,
     desc="输入关键词'点歌 歌曲名称'即可获取对应歌曲详情和播放链接",
-    version="4.0",
+    version="3.0",
     author="Lingyuzhou",
 )
 class SearchMusic(Plugin):
-    # 定义不同音乐平台对应的appid映射
-    PLATFORM_APPIDS = {
-        "kugou": "wx79f2c4418704b4f8",    # 酷狗音乐
-        "kuwo": "wxc305711a2a7ad71c",     # 酷我音乐
-        "netease": "wx8dd6ecd81906fd84",  # 网易云音乐
-        "qishui": "wx904fb3ecf62c7dea",   # 汽水音乐
-        "kugou_mv": "wx72b795aca60ad321"  # 酷狗MV
-    }
-    
-    # 平台显示名称映射
-    PLATFORM_DISPLAY_NAMES = {
-        "kugou": {"prefix": "[酷狗]", "source": "酷狗音乐"},
-        "kuwo": {"prefix": "[酷我]", "source": "酷我音乐"},
-        "netease": {"prefix": "[网易]", "source": "网易云音乐"},
-        "qishui": {"prefix": "[汽水]", "source": "汽水音乐"},
-        "kugou_mv": {"prefix": "[酷狗MV]", "source": "酷狗MV"}
-    }
-    
     def __init__(self):
         super().__init__()
         self.handlers[Event.ON_HANDLE_CONTEXT] = self.on_handle_context
@@ -51,29 +33,32 @@ class SearchMusic(Plugin):
         :param singer: 歌手名
         :param url: 音乐播放链接
         :param thumb_url: 封面图片URL（可选）
-        :param platform: 音乐平台（酷狗/网易/汽水/酷我）
+        :param platform: 音乐平台（酷狗/网易/抖音）
         :return: appmsg XML字符串
         """
         # 处理封面URL
         if thumb_url:
-            # 确保URL是以http或https开头
+            # 不再移除抖音图片URL的后缀
+            # 只确保URL是以http或https开头的
             if not thumb_url.startswith(("http://", "https://")):
                 thumb_url = "https://" + thumb_url.lstrip("/")
-            # 强制将http协议转换为https协议（微信安全要求）
-            elif thumb_url.startswith("http://"):
-                thumb_url = thumb_url.replace("http://", "https://", 1)
+            
             # 确保URL没有特殊字符
             thumb_url = thumb_url.replace("&", "&amp;")
                 
-        # 根据平台获取对应的appid和显示信息
-        platform_lower = platform.lower()
-        appid = self.PLATFORM_APPIDS.get(platform_lower, "")
-        
-        # 获取平台显示信息
-        platform_info = self.PLATFORM_DISPLAY_NAMES.get(platform_lower)
-        if platform_info:
-            display_title = f"{platform_info['prefix']} {title}"
-            source_display_name = platform_info['source']
+        # 根据平台在标题中添加前缀
+        if platform.lower() == "kugou":
+            display_title = f"[酷狗] {title}"
+            source_display_name = "酷狗音乐"
+        elif platform.lower() == "netease":
+            display_title = f"[网易] {title}"
+            source_display_name = "网易云音乐"
+        elif platform.lower() == "qishui":
+            display_title = f"[汽水] {title}"
+            source_display_name = "汽水音乐"
+        elif platform.lower() == "kuwo":
+            display_title = f"[酷我] {title}"
+            source_display_name = "酷我音乐"
         else:
             display_title = title
             source_display_name = "音乐分享"
@@ -81,8 +66,8 @@ class SearchMusic(Plugin):
         # 确保URL没有特殊字符
         url = url.replace("&", "&amp;")
         
-        # 使用更简化的XML结构，但保留关键标签，并添加对应的appid
-        xml = f"""<appmsg appid="{appid}" sdkver="0">
+        # 使用更简化的XML结构，但保留关键标签
+        xml = f"""<appmsg appid="" sdkver="0">
     <title>{display_title}</title>
     <des>{singer}</des>
     <action>view</action>
@@ -115,85 +100,7 @@ class SearchMusic(Plugin):
 </appmsg>"""
         
         # 记录生成的XML，便于调试
-        logger.debug(f"[SearchMusic] 生成的音乐卡片XML (平台: {platform}, appid: {appid}): {xml}")
-        
-        return xml
-
-    def construct_mv_appmsg(self, title, singer, video_url, thumb_url="", platform="kugou_mv"):
-        """
-        构造MV分享卡片的appmsg XML
-        :param title: MV标题
-        :param singer: 歌手名
-        :param video_url: MV播放链接
-        :param thumb_url: 封面图片URL（可选）
-        :param platform: 平台名称（默认为kugou_mv）
-        :return: appmsg XML字符串
-        """
-        # 处理封面URL
-        if thumb_url:
-            # 确保URL是以http或https开头
-            if not thumb_url.startswith(("http://", "https://")):
-                thumb_url = "https://" + thumb_url.lstrip("/")
-            # 强制将http协议转换为https协议（微信安全要求）
-            elif thumb_url.startswith("http://"):
-                thumb_url = thumb_url.replace("http://", "https://", 1)
-            # 确保URL没有特殊字符
-            thumb_url = thumb_url.replace("&", "&amp;")
-        else:
-            # 使用默认MV封面
-            thumb_url = "https://p2.music.126.net/tGHU62DTszbFQ37W9qPHcw==/2002210674180197.jpg"
-                
-        # 根据平台获取对应的appid和显示信息
-        platform_lower = platform.lower()
-        appid = self.PLATFORM_APPIDS.get(platform_lower, "")
-        
-        # 获取平台显示信息
-        platform_info = self.PLATFORM_DISPLAY_NAMES.get(platform_lower)
-        if platform_info:
-            display_title = f"{platform_info['prefix']} {title}"
-            source_display_name = platform_info['source']
-        else:
-            display_title = title
-            source_display_name = "MV分享"
-        
-        # 确保URL没有特殊字符
-        video_url = video_url.replace("&", "&amp;")
-        
-        # 构造MV卡片XML，使用type=5表示视频类型
-        xml = f"""<appmsg appid="{appid}" sdkver="0">
-    <title>{display_title}</title>
-    <des>{singer}</des>
-    <action>view</action>
-    <type>5</type>
-    <showtype>0</showtype>
-    <soundtype>0</soundtype>
-    <mediatagname>视频</mediatagname>
-    <messageaction></messageaction>
-    <content></content>
-    <contentattr>0</contentattr>
-    <url>{video_url}</url>
-    <lowurl>{video_url}</lowurl>
-    <dataurl>{video_url}</dataurl>
-    <lowdataurl>{video_url}</lowdataurl>
-    <appattach>
-        <totallen>0</totallen>
-        <attachid></attachid>
-        <emoticonmd5></emoticonmd5>
-        <fileext>mp4</fileext>
-        <cdnthumburl>{thumb_url}</cdnthumburl>
-        <cdnthumbaeskey></cdnthumbaeskey>
-        <aeskey></aeskey>
-    </appattach>
-    <extinfo></extinfo>
-    <sourceusername></sourceusername>
-    <sourcedisplayname>{source_display_name}</sourcedisplayname>
-    <thumburl>{thumb_url}</thumburl>
-    <songalbumurl>{thumb_url}</songalbumurl>
-    <songlyric></songlyric>
-</appmsg>"""
-        
-        # 记录生成的XML，便于调试
-        logger.debug(f"[SearchMusic] 生成的MV卡片XML (平台: {platform}, appid: {appid}): {xml}")
+        logger.debug(f"[SearchMusic] 生成的音乐卡片XML: {xml}")
         
         return xml
 
@@ -1077,21 +984,15 @@ class SearchMusic(Plugin):
                                 singer = mv_data["singer"]
                                 video_url = mv_data["url"]
                                 
-                                # 获取MV封面图片
-                                thumb_url = mv_data.get('cover', '')
-                                
                                 # 验证视频URL是否有效
                                 valid_url = self.get_video_url(video_url)
                                 if valid_url:
                                     # 记录MV信息，便于调试
-                                    logger.info(f"[SearchMusic] 酷狗MV详情: {title} - {singer}, URL: {valid_url}, 封面: {thumb_url}")
+                                    logger.info(f"[SearchMusic] 酷狗MV详情: {title} - {singer}, URL: {valid_url}")
                                     
-                                    # 构造MV分享卡片
-                                    appmsg = self.construct_mv_appmsg(title, singer, valid_url, thumb_url, "kugou_mv")
-                                    
-                                    # 返回APP消息类型
-                                    reply.type = ReplyType.APP
-                                    reply.content = appmsg
+                                    # 返回文本消息类型，使用emoji+文本链接的形式
+                                    reply.type = ReplyType.TEXT
+                                    reply.content = f"🎵 歌曲：{title}\n🎤 歌手：{singer}\n🖼 歌曲封面：{mv_data.get('cover', '')}\n▶️ 播放MV：{valid_url}"
                                 else:
                                     reply.content = "视频链接无效，请稍后重试或尝试其他MV"
                             else:
@@ -1149,7 +1050,7 @@ class SearchMusic(Plugin):
             "1. 酷狗音乐：\n"
             "   - 搜索歌单：发送「酷狗点歌 歌曲名称」\n"
             "   - 音乐卡片：发送「酷狗点歌 歌曲名称 序号」\n"
-            "   - MV卡片：发送「酷狗MV 歌曲名称」搜索MV，发送「酷狗MV 歌曲名称 序号」获取MV卡片\n"
+            "   - 视频播放：发送「酷狗MV 歌曲名称」搜索MV，发送「酷狗MV 歌曲名称 序号」获取MV详情\n"
             "   - 语音播放：发送「酷狗听歌 歌曲名称 序号」\n"
             "2. 网易音乐：\n"
             "   - 搜索歌单：发送「网易点歌 歌曲名称」\n"
